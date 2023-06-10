@@ -196,6 +196,10 @@ class B2YBank(object):
         if inflow.startswith("-"):
             row[inflow_index] = ""
             row[outflow_index] = inflow[1:]
+        outflow = row[outflow_index]
+        if outflow.startswith("-"):
+            row[outflow_index] = ""
+            row[inflow_index] = outflow[1:]
         return row
 
     def _fix_inflow(self, row):
