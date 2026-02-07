@@ -345,21 +345,10 @@ def clean_monetary_values(num_series: pd.Series) -> pd.Series:
     :return: modified series
     :rtype: Series
     """
-    # convert all commas to full stops
-    num_series.replace({"\\,": "."}, regex=True, inplace=True)
-    # remove all except last decimal point
-    num_series.replace({"\\.(?=.*?\\.)": ""}, regex=True, inplace=True)
-    # remove all non-digit characters
-    num_series.replace(
-        {
-            "[^\\d\\.-]": "",
-        },
-        regex=True,
-        inplace=True,
-    )
-    # fill in null values with 0
-    return_series: pd.Series[float] = num_series.fillna(value=0).astype(float)
-    return return_series
+    num_series = num_series.replace({"\\,": "."}, regex=True)
+    num_series = num_series.replace({"\\.(?=.*?\\.)": ""}, regex=True)
+    num_series = num_series.replace({"[^\\d\\.-]": ""}, regex=True)
+    return num_series.fillna(0).astype(float)
 
 
 def remove_invalid_rows(df: pd.DataFrame) -> pd.DataFrame:
@@ -374,41 +363,35 @@ def remove_invalid_rows(df: pd.DataFrame) -> pd.DataFrame:
     :rtype: pd.DataFrame
     """
     # filter out rows where Inflow and Outflow are both blank
-    df.query("Inflow.notna() | Outflow.notna()", inplace=True)
+    df = df.query("Inflow.notna() | Outflow.notna()")
+
     # filter rows with an invalid date
-    df.query("Date.notna()", inplace=True)
-    df.fillna(0, inplace=True)
-    df.query("amount!=0", inplace=True)
-    df.reset_index(inplace=True)
+    df = df.query("Date.notna()")
+
+    # fill numeric columns only
+    numeric_cols = df.select_dtypes(include=["number"]).columns
+    df[numeric_cols] = df[numeric_cols].fillna(0)
+
+    # remove zero-amount rows
+    df = df.query("amount != 0")
+
+    df = df.reset_index(drop=True)
     return df
 
 
 def auto_memo(df: pd.DataFrame, fill_memo: bool) -> pd.DataFrame:
-    """
-    If memo is blank, fill with contents of payee column.
-
-    :param df: dataframe to modify
-    :type df: pd.DataFrame
-    :param fill_memo: boolean to check
-    :type fill_memo: bool
-    :return: modified dataframe
-    :rtype: pd.DataFrame
-    """
     if fill_memo:
-        df["Memo"].fillna(df["Payee"], inplace=True)
+        df["Memo"] = df["Memo"].astype("string")
+        df["Payee"] = df["Payee"].astype("string")
+        df.loc[df["Memo"].isna(), "Memo"] = df["Payee"]
     return df
 
 
-def auto_payee(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    If Payee is blank, fill with contents of Memo column
 
-    :param df: dataframe to modify
-    :type df: pd.DataFrame
-    :return: modified dataframe
-    :rtype: pd.DataFrame
-    """
-    df["Payee"].fillna(df["Memo"], inplace=True)
+def auto_payee(df: pd.DataFrame) -> pd.DataFrame:
+    df["Payee"] = df["Payee"].astype("string")
+    df["Memo"] = df["Memo"].astype("string")
+    df.loc[df["Payee"].isna(), "Payee"] = df["Memo"]
     return df
 
 
